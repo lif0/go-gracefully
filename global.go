@@ -1,8 +1,15 @@
 package gogracefully
 
+import (
+	"github.com/lif0/go-gracefully/internal"
+	"github.com/lif0/pkg/utils/errx"
+)
+
 var (
-	defaultRegistry              = NewRegistry()
+	defaultRegistry = NewRegistry()
+
 	DefaultRegisterer Registerer = defaultRegistry
+	GlobalErrors                 = internal.NewSyncObject(errx.MultiError{})
 )
 
 // SetGlobal sets a custom GracefullyRegister as the global registry.

@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"unsafe"
+
+	"github.com/lif0/pkg/utils/errx"
 )
 
 // Registry is a thread-safe registry for instances which should be can graceful shutdown.
@@ -18,6 +20,16 @@ type Registry struct {
 	// chan shutdown done
 	chsd     chan struct{}
 	disposed atomic.Bool
+}
+
+// NewRegistry creates and returns a new initialized Registerer.
+//
+// If you want to set new Registerer as Global, use gogracefully.SetGlobal()
+// (e.g. for testing purposes).
+func NewRegistry() *Registry {
+	return &Registry{
+		instances: make(map[unsafe.Pointer]GracefulShutdownObject),
+	}
 }
 
 // Register implements Registerer.
@@ -79,19 +91,19 @@ func (r *Registry) MustRegister(igss ...GracefulShutdownObject) {
 }
 
 // Shutdown implements Registerer.
-func (r *Registry) Shutdown(ctx context.Context) MultiError {
+func (r *Registry) Shutdown(ctx context.Context) errx.MultiError {
 	if err := r.isDisposed(); err != nil {
-		return MultiError{err}
+		return errx.MultiError{err}
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if !r.disposed.CompareAndSwap(false, true) {
-		return MultiError{ErrAllInstanceShutdownAlready}
+		return errx.MultiError{ErrAllInstanceShutdownAlready}
 	}
 
-	errs := MultiError{}
+	errs := errx.MultiError{}
 	for _, v := range r.instances {
 		gsErr := v.GracefulShutdown(ctx)
 		if gsErr != nil {
@@ -109,6 +121,7 @@ func (r *Registry) WaitShutdown() {
 	<-r.chsd
 }
 
+// isDisposed ...
 func (r *Registry) isDisposed() error {
 	if r.disposed.Load() {
 		return ErrAllInstanceShutdownAlready

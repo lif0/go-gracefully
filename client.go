@@ -2,6 +2,8 @@ package gogracefully
 
 import (
 	"context"
+
+	"github.com/lif0/pkg/utils/errx"
 )
 
 // Registerer is the interface for the part of a registry in charge of
@@ -39,7 +41,7 @@ type Registerer interface {
 	// It uses the provided context for shutdown operations and collects errors,
 	// keyed by the instance names returned from GracefulShutdownName.
 	// Returns a map of errors; empty if all shutdowns succeeded.
-	Shutdown(ctx context.Context) MultiError
+	Shutdown(ctx context.Context) errx.MultiError
 	// WaitShutdown blocks the calling goroutine until Registry has finished
 	// shutdown all registered instances.
 	WaitShutdown()

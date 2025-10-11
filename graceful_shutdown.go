@@ -1,25 +1,61 @@
 package gogracefully
 
-import "context"
+import (
+	"context"
+	"log"
+	"os"
+	"sync"
 
-// ShutdownAll shuts down all registered GracefulShutdown instances synchronously.
-// It uses the provided context for shutdown operations and collects errors in a map,
-// keyed by the instance names returned from GracefulShutdownName.
-// Returns a map of errors; empty if all shutdowns succeeded.
-func (gr *GracefullyRegister) ShutdownAll(ctx context.Context) map[string]error {
-	gr.mu.Lock()
-	defer gr.mu.Unlock()
+	"github.com/lif0/pkg/concurrency/chanx"
+	"github.com/lif0/pkg/utils/errx"
+)
 
-	errs := make(map[string]error)
-	for _, v := range gr.instances {
-		instanceErr := v.GracefulShutdown(ctx)
-		if instanceErr != nil {
-			errs[v.GracefulShutdownName()] = instanceErr
-		}
+// SetShutdownTrigger sets up a trigger for Registry.Shutdown.
+//
+// This global function takes a context for cancellation; if the context is canceled,
+// the trigger will not activate, and the function will simply return.
+// It accepts options to specify signals or channels that will trigger the shutdown.
+func SetShutdownTrigger(ctx context.Context, opts ...TriggerOption) {
+	c := newDefaultTriggerConfig()
+	for _, opt := range opts {
+		opt(c)
 	}
 
-	return errs
-}
+	go func() {
+		var once sync.Once // ensures graceful Shutdown is attempted only once
+		var firstSignal bool = false
+		singleUserChan := chanx.FanIn(ctx, c.usrch...)
 
-// func (gr *GracefullyRegister) ShutdownAllAsync() error {
-// }
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case sig := <-c.sysch:
+				log.Printf("gogracefully: Received system signal - %s\n", sig.String())
+			case <-singleUserChan:
+				log.Printf("gogracefully: Received user trigger\n")
+			}
+
+			firstSignal = !firstSignal
+
+			if firstSignal {
+				once.Do(func() {
+					shutdownCtx, cancel := context.WithTimeout(ctx, c.timeout)
+					defer cancel()
+
+					// log.Printf("gogracefully: Starting graceful shutdown with timeout\n")
+					if muErr := defaultRegistry.Shutdown(shutdownCtx); muErr != nil {
+						GlobalErrors.Mutate(func(v *errx.MultiError) {
+							v.Append(muErr)
+						})
+					}
+					log.Printf("gogracefully: Graceful shutdown completed. Use gogracefully.GlobalErrors for checks errors\n")
+				})
+			} else {
+				// Second or subsequent signal: Force exit
+				log.Printf("gogracefully: Received additional signal - forcing exit\n")
+				os.Exit(1) // Or os.Exit(130) for SIGINT, etc.
+			}
+		}
+	}()
+}
