@@ -1,4 +1,4 @@
-package gogracefully
+package gracefully
 
 import (
 	"github.com/lif0/go-gracefully/internal"

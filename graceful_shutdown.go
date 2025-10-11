@@ -1,4 +1,4 @@
-package gogracefully
+package gracefully
 
 import (
 	"context"

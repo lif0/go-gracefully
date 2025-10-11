@@ -1,4 +1,4 @@
-package gogracefully
+package gracefully
 
 // NewInstance creates a new instance of type T using the provided factory function,
 // registers it in the global registry via MustRegister, and returns it.

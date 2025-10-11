@@ -1,4 +1,4 @@
-package gogracefully
+package gracefully
 
 import (
 	"context"
@@ -28,7 +28,10 @@ type Registry struct {
 // (e.g. for testing purposes).
 func NewRegistry() *Registry {
 	return &Registry{
+		mu:        sync.Mutex{},
 		instances: make(map[unsafe.Pointer]GracefulShutdownObject),
+		disposed:  atomic.Bool{},
+		chsd:      make(chan struct{}),
 	}
 }
 

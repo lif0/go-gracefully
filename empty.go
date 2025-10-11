@@ -3,4 +3,4 @@
 // performing synchronous shutdowns with context support, and handling errors.
 // The package includes a global registry, registration functions, and utilities
 // for safe instance management in concurrent environments.
-package gogracefully
+package gracefully
