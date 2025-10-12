@@ -20,3 +20,7 @@ func (so *SyncObject[T]) Mutate(f func(v *T)) {
 
 	f(&so.v)
 }
+
+func (so *SyncObject[T]) GetObject() *T {
+	return &so.v
+}
