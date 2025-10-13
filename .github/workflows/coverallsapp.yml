@@ -33,7 +33,6 @@ jobs:
           go-version-file: go.mod
           cache: true
           cache-dependency-path: go.sum
-          #go-version: ${{ env.GO_VERSION }}
 
       - name: Vet
         run: go vet ./...
@@ -53,14 +52,3 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           file:  coverage_package.out
           format: golang
-          parallel: true
-
-  finish:
-    needs: test
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Finish upload to Coveralls
-        uses: coverallsapp/github-action@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
