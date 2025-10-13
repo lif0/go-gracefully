@@ -71,7 +71,7 @@ func WithTimeout(timeout time.Duration) TriggerOption {
 func newDefaultTriggerConfig() *TriggerConfig {
 	config := &TriggerConfig{}
 	WithSysSignal()(config)
-	WithTimeout(30 * time.Second)(config)
+	WithTimeout(15 * time.Minute)(config)
 
 	return config
 }

@@ -6,36 +6,37 @@
 [![coverage](https://coveralls.io/repos/github/lif0/go-gracefully/badge.svg?branch=main)](https://coveralls.io/github/lif0/go-gracefully?branch=main)
 [![report card](https://goreportcard.com/badge/github.com/lif0/go-gracefully)](https://goreportcard.com/report/github.com/lif0/go-gracefully)
 
-Graceful shutdown utility for Golang.
+Graceful shutdown utility for Golang applications. Register objects that need cleanup and trigger shutdown on signals or custom events.
 
 ## Contents
 
-- [Overview](#overview)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Features](#features)
-  - [GracefulShutdownObject Interface](#gracefulshutdownobject-interface)
-  - [Registry and NewRegistry](#registry-and-newregistry)
-  - [Register, Unregister, MustRegister](#register-unregister-mustregister)
-  - [Shutdown and WaitShutdown](#shutdown-and-waitshutdown)
-  - [Global Functions](#global-functions)
-  - [SetShutdownTrigger and Trigger Options](#setshutdowntrigger-and-trigger-options)
-  - [NewInstance](#newinstance)
-  - [Errors](#errors)
-- [Roadmap](#roadmap)
-- [License](#license)
+- [Overview](#-overview)
+- [Requirements](#-requirements)
+- [Installation](#-installation)
+- [Usage Guide](#-usage-guide)
+    - [Step 1: GracefulShutdownObject](#step-1-implement-the-gracefulshutdownobject-interface)
+    - [Step 2: Register objects](#step-2-register-objects)
+    - [Step 3: Set triggers](#step-3-set-up-shutdown-triggers)
+    - [Step 4: Handle shutdown](#step-4-handle-shutdown)
+    - [Step 5: Unregister](#step-5-unregister-if-needed)
+- [Examples](#-examples)
+- [Roadmap](#-roadmap)
+- [License](#-license)
 
 ---
 
 ## 📋 Overview
 
-Package `gracefully` provides a thread-safe registry for managing graceful shutdown instances in Go applications. It allows registering objects that implement the `GracefulShutdownObject` interface, performing synchronous shutdowns with context support, and handling errors. The package includes a global registry, registration functions, and utilities for safe instance management in concurrent environments.
+The `gracefully` package is designed to simplify graceful shutdowns in Go applications. The core concept revolves around a thread-safe registry that manages objects implementing a simple interface for shutdown logic. This allows you to register components like servers, databases, or any resources that require proper cleanup before the program exits.
 
-This utility is designed for universal use, such as in web servers, CLI tools, or any long-running Go programs that need to handle shutdown signals (e.g., SIGINT, SIGTERM) gracefully, ensuring resources like databases, servers, or connections are closed properly.
+Key ideas:
 
-## ⚙️ Requirements
+- **Registry-based management**: A central registry (global by default) holds references to shutdownable objects. It's safe for concurrent use and prevents duplicate registrations.
+- **Trigger-based shutdown**: Shutdown can be triggered by OS signals (e.g., SIGINT, SIGTERM), custom channels, or manually. It respects contexts for timeouts and collects errors from failed shutdowns.
+- **Error handling**: Uses a multi-error type to aggregate issues, with global access for post-shutdown checks.
+- **Flexibility**: Supports custom registries, priorities (future), and extensions for universal use in web apps, CLI tools, or services.
 
-- Go 1.19 or higher
+This approach ensures your application handles interruptions politely, avoiding data corruption or abrupt terminations, especially in production environments like Docker or Kubernetes.
 
 ## 📦 Installation
 
@@ -51,29 +52,26 @@ Import it in your code:
 import "github.com/lif0/go-gracefully"
 ```
 
-## ✨ Features
+## ✨ Usage Guide
 
-### GracefulShutdownObject Interface
+### Step 1: Implement the GracefulShutdownObject Interface
 
-The core interface that any object must implement to be registered for graceful shutdown.
+Any object that needs graceful shutdown must implement this interface:
 
 ```go
 type GracefulShutdownObject interface {
-    GracefulShutdown(context.Context) error
+    GracefulShutdown(ctx context.Context) error
 }
 ```
 
-**Description:**  
-Implement this interface for any struct that needs to perform cleanup during shutdown. The method should respect the provided context (e.g., for timeouts) and return an error if shutdown fails.
-
-**Example:**
+Example implementation for a custom batcher:
 
 ```go
-type Batcher struct {
-    // server fields
+type MyBatcher struct {
+    // Your batcher fields, e.g.
 }
 
-func (s *Batcher) GracefulShutdown(ctx context.Context) error {
+func (s *MyBatcher) GracefulShutdown(ctx context.Context) error {
     // Flush data to disk,db, etc.
     select {
     case <-ctx.Done():
@@ -85,173 +83,125 @@ func (s *Batcher) GracefulShutdown(ctx context.Context) error {
 }
 ```
 
-### Registry and NewRegistry
+### Step 2: Register Objects
 
-`Registry` is a thread-safe registry for instances that support graceful shutdown.
+Use the global registry:
 
 ```go
-func NewRegistry() *Registry
+import "github.com/lif0/go-gracefully"
+
+myBatcher := &MyBatcher{}
+gracefully.MustRegister(myBatcher)
 ```
 
-**Description:**  
-Creates a new `Registry` instance. Use this for custom registries (e.g., in tests). The registry manages registrations, unregistrations, and shutdowns.
+### Step 3: Set Up Shutdown Triggers
 
-**Example:**
+Launch a goroutine to listen for triggers.
+
+⚠️ Important: If you do not call this function, no triggers will be registered, and graceful shutdown will not occur automatically (e.g., on signals). You would need to call Shutdown manually in that case. (see [Step 4](#step-4-handle-shutdown))
 
 ```go
-reg := gracefully.NewRegistry()
+
+gracefully.SetShutdownTrigger(context.Background())
 ```
 
-### Register, Unregister, MustRegister
-
-Methods on `Registry` (and `Registerer` interface) for managing instances.
-
-- `Register(igs GracefulShutdownObject) error`
-- `Unregister(igs GracefulShutdownObject) bool`
-- `MustRegister(igss ...GracefulShutdownObject)`
-
-**Description:**  
-
-- `Register`: Adds an instance to the registry. Returns an error if already registered (e.g., `AlreadyRegisteredError`).
-- `Unregister`: Removes an instance if it exists.
-- `MustRegister`: Registers multiple instances and panics on error.
-
-**Example:**
+or
 
 ```go
-dataBatcher := &Batcher{}
-err := reg.Register(dataBatcher)
-if err != nil {
-    // Handle error
-}
-
-reg.MustRegister(anotherInstance)
-
-unregistered := reg.Unregister(dataBatcher) // true if removed
+gracefully.SetShutdownTrigger(
+    context.Background(),
+    gracefully.WithSysSignal(),
+    gracefully.WithTimeout(time.Hour)
+    )
 ```
 
-### Shutdown and WaitShutdown
+### Custom Options
 
-Methods to initiate and wait for shutdown.
+#### WithSysSignal()
 
-- `Shutdown(ctx context.Context) errx.MultiError`
-- `WaitShutdown()`
+Registers `signal.Notify` for SIGINT and SIGTERM signals on the signal channel. This option is enabled by default.
 
-**Description:**  
+A repeated signal will invoke `os.Exit(130)`, which immediately terminates the application without waiting for any ongoing processes.
 
-- `Shutdown`: Shuts down all registered instances in sequence, collecting errors in a `MultiError`. Marks the registry as disposed.
-- `WaitShutdown`: Blocks until shutdown is complete (via a channel).
+#### WithCustomSystemSignal(ch chan os.Signal)
 
-**Example:**
+Provides your own custom signal channel for handling OS signals.
 
 ```go
-ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+ch := make(chan os.Signal, 1)
+signal.Notify(ch, syscall.SIGUSR1 /* or any other signals */)
+gracefully.SetShutdownTrigger(ctx, gracefully.WithCustomSystemSignal(ch))
+```
+
+#### WithUserChanSignal(uch ...<-chan struct{})
+
+Allows you to pass one or more custom channels. When any of these channels is closed or receives a value, the graceful shutdown process will be triggered.
+
+```go
+chShutdown := make(chan struct{})
+gracefully.SetShutdownTrigger(ctx, gracefully.WithUserChanSignal(chShutdown))
+
+// To trigger the shutdown: close(chShutdown) or chShutdown <- struct{}{}
+```
+
+#### WithTimeout(d time.Duration)
+
+Sets the maximum duration allowed for completing the shutdown of all registered objects. The default value is 15 minutes.
+
+### Step 4: Handle Shutdown
+
+The trigger will call `Shutdown` automatically. Manually:
+
+```go
+shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 defer cancel()
-
-errs := reg.Shutdown(ctx)
+errs := gracefully.DefaultRegisterer.Shutdown(shutdownCtx)
 if errs != nil {
-    // Handle errors
+    // Check gracefully.GlobalErrors for details
 }
-
-reg.WaitShutdown() // Block until done
 ```
 
-### Global Functions
-
-Convenience wrappers using the default global registry.
-
-- `Register(igs GracefulShutdownObject) error`
-- `Unregister(igs GracefulShutdownObject) bool`
-- `MustRegister(igss ...GracefulShutdownObject)`
-- `WaitShutdown()`
-- `SetGlobal(gr *Registry)`
-
-**Description:**  
-These operate on the default registry. `SetGlobal` allows replacing the default for custom use (e.g., testing).
-
-**Example:**
+Wait for completion:
 
 ```go
-gracefully.MustRegister(server)
-
 gracefully.WaitShutdown()
 ```
 
-### SetShutdownTrigger and Trigger Options
-
-Sets up triggers for automatic shutdown.
+### Step 5: Unregister if Needed
 
 ```go
-func SetShutdownTrigger(ctx context.Context, opts ...TriggerOption)
+unregistered := gracefully.Unregister(server) // Returns true if removed
 ```
 
-Options:
+### Advanced: Create and Register Instances
 
-- `WithSysSignal()`: Default signals (SIGINT, SIGTERM).
-- `WithCustomSystemSignal(ch chan os.Signal)`: Custom signal channel.
-- `WithUserChanSignal(uch ...<-chan struct{})`: User-defined channels.
-- `WithTimeout(timeout time.Duration)`: Shutdown timeout (default 30s).
-
-**Description:**  
-Runs in a goroutine, listening for signals or channels to trigger `Shutdown`. On second signal, forces exit with `os.Exit(1)`.
-
-**Example:**
+Use generics for quick creation:
 
 ```go
-userCh := make(chan struct{})
-
-gracefully.SetShutdownTrigger(context.Background(),
-    gracefully.WithSysSignal(),
-    gracefully.WithUserChanSignal(userCh),
-    gracefully.WithTimeout(45*time.Second),
-)
-
-// Later, close userCh to trigger shutdown
-close(userCh)
-```
-
-### NewInstance
-
-Creates and registers an instance generically.
-
-```go
-func NewInstance[T GracefulShutdownObject](fNew func() T) T
-```
-
-**Description:**  
-Uses a factory function to create a new instance of type `T` (must implement `GracefulShutdownObject`) and registers it globally via `MustRegister`.
-
-**Example:**
-
-```go
-server := gracefully.NewInstance(func() *MyServer {
-    return &MyServer{}
+batcher := gracefully.NewInstance(func() *MyBatcher {
+    return &MyBatcher{}
 })
 ```
 
-### Errors
+### Error Handling
 
-- `ErrAllInstanceShutdownAlready`: Cannot register after shutdown.
-- `AlreadyRegisteredError`: Duplicate registration attempted.
+- Check `gracefully.GlobalErrors` after shutdown.
+- Specific errors: `ErrAllInstanceShutdownAlready`, `AlreadyRegisteredError`.
 
-**Description:**  
-Errors are handled via `errx.MultiError` for multiple shutdown failures. Global errors are stored in `GlobalErrors`.
+For full details, see the GoDoc: [pkg.go.dev/github.com/lif0/go-gracefully](https://pkg.go.dev/github.com/lif0/go-gracefully).
 
-**Example:**
+## 👩🏻‍🏫 Examples
 
-```go
-if err, ok := err.(*gracefully.AlreadyRegisteredError); ok {
-    // Use err.ExistingInstance
-}
-```
+Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/main/example) for complete, runnable demos, including HTTP server shutdown and custom triggers.
 
 ## 🗺️ Roadmap
 
-- [ ] Add priority-based shutdown ordering.
+- [ ]Priority-based shutdown ordering.
 - [ ] Support for asynchronous shutdowns.
 - [ ] Integration with popular libraries (e.g., net/http.Server wrappers).
-- [ ] Enhanced logging and metrics.
-- [ ] Comprehensive unit and benchmarks.
+- [ ] Improved logging and metrics integration.
+- [ ] Full unit-test suite.
+- [ ] Full benchmark suite.
 
 ## 📄 License
 
