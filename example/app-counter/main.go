@@ -23,7 +23,6 @@ func main() {
 	gracefully.Register(counter)
 
 	fmt.Printf("Last counter: %d\n", counter.val)
-	fmt.Println("Press any key to increment (press 'q' to quit)")
 
 	go func() {
 		for {

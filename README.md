@@ -20,6 +20,8 @@ Graceful shutdown utility for Golang applications. Register objects that need cl
     - [Step 4: Handle shutdown](#step-4-handle-shutdown)
     - [Step 5: Unregister](#step-5-unregister-if-needed)
 - [Examples](#-examples)
+    - [app-counter](#app-counter)
+    - [more](#more)
 - [Roadmap](#-roadmap)
 - [License](#-license)
 
@@ -192,11 +194,62 @@ For full details, see the GoDoc: [pkg.go.dev/github.com/lif0/go-gracefully](http
 
 ## 👩🏻‍🏫 Examples
 
+### App counter
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/lif0/go-gracefully"
+)
+
+var stopChan chan struct{}
+
+func main() {
+	// configure
+    // It will be triggered:
+    // close(stopChan) OR
+    // stopChan<-struct{}{} OR
+    // kill {PID} (Ctrl+C in console)
+
+	gracefully.SetShutdownTrigger(
+		context.Background(),
+		gracefully.WithSysSignal(),
+		gracefully.WithUserChanSignal(stopChan),
+	)
+
+	counter := NewCounter()
+
+	gracefully.MustRegister(counter)
+
+	go func() {
+		for {
+			time.Sleep(500 * time.Millisecond)
+			counter.Inc()
+			fmt.Printf("counter: %v\n", counter.val)
+		}
+	}()
+
+    go func() {
+        time.Sleep(time.Hour)
+        close(stopChan)
+    }()
+
+	gracefully.WaitShutdown() // Wait finish stop all registered objects
+	fmt.Println("App finish")
+}
+```
+
+### More
 Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/main/example) for complete, runnable demos, including HTTP server shutdown and custom triggers.
 
 ## 🗺️ Roadmap
 
-- [ ]Priority-based shutdown ordering.
+- [ ] Priority-based shutdown ordering.
 - [ ] Support for asynchronous shutdowns.
 - [ ] Integration with popular libraries (e.g., net/http.Server wrappers).
 - [ ] Improved logging and metrics integration.
