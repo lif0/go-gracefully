@@ -1,0 +1,66 @@
+name: test coverage coverallsapp
+on:
+  workflow_run:
+    workflows: ["multi-version tests"]
+    types:
+      - completed
+  push:
+    branches:
+      - main
+    paths:
+      - '**.go'
+  pull_request:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: stable
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+          #go-version: ${{ env.GO_VERSION }}
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: |
+          go test ./... -race -covermode=atomic -coverprofile=coverage_package.out
+          pwd
+          ls
+
+      - name: Upload to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file:  coverage_package.out
+          format: golang
+          parallel: true
+
+  finish:
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Finish upload to Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
