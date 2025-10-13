@@ -1,0 +1,44 @@
+name: multi-version tests
+
+on:
+  workflow_run:
+    workflows: ["build"]
+    types:
+      - completed
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # Allow all versions to run even if one fails
+      matrix:
+        go-version: ['1.24', '1.25']
+
+    steps:
+      - name: Clone repo
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./... -race
