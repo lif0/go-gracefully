@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Changed
 
+## [v0.0.2]
+### Added
+### Fixed
+### Changed
+
 ## [v0.0.1]
 ### Added
 - feat: release graceful shutdown
