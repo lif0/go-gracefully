@@ -8,14 +8,14 @@ import (
 )
 
 // TriggerConfig represents the configuration for shutdown triggers.
-type TriggerConfig struct {
+type triggerConfig struct {
 	sysch <-chan os.Signal
 	usrch []<-chan struct{}
 
 	timeout time.Duration
 }
 
-type TriggerOption func(*TriggerConfig)
+type TriggerOption func(*triggerConfig)
 
 // WithCustomSystemSignal adds a custom OS signal channel
 //
@@ -25,7 +25,7 @@ type TriggerOption func(*TriggerConfig)
 //		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, ...other signals)
 //	 	gogracefully.SetShutdownTrigger(ctx, WithCustomSystemSignal(sysCh))
 func WithCustomSystemSignal(ch chan os.Signal) TriggerOption {
-	return func(c *TriggerConfig) {
+	return func(c *triggerConfig) {
 		c.sysch = ch
 	}
 }
@@ -39,7 +39,7 @@ func WithCustomSystemSignal(ch chan os.Signal) TriggerOption {
 //
 //	gogracefully.SetShutdownTrigger(ctx, WithSysSignal())
 func WithSysSignal() TriggerOption {
-	return func(c *TriggerConfig) {
+	return func(c *triggerConfig) {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
@@ -50,7 +50,7 @@ func WithSysSignal() TriggerOption {
 // WithUserChanSignal adds custom user channels that will trigger graceful shutdown
 // when closed. Useful for custom shutdown conditions beyond OS signals.
 func WithUserChanSignal(uch ...<-chan struct{}) TriggerOption {
-	return func(c *TriggerConfig) {
+	return func(c *triggerConfig) {
 		c.usrch = uch
 	}
 }
@@ -62,14 +62,14 @@ func WithUserChanSignal(uch ...<-chan struct{}) TriggerOption {
 //
 //	WithTimeout(45 * time.Second)
 func WithTimeout(timeout time.Duration) TriggerOption {
-	return func(c *TriggerConfig) {
+	return func(c *triggerConfig) {
 		c.timeout = timeout
 	}
 }
 
 // newDefaultTriggerConfig create default config
-func newDefaultTriggerConfig() *TriggerConfig {
-	config := &TriggerConfig{}
+func newDefaultTriggerConfig() *triggerConfig {
+	config := &triggerConfig{}
 	WithSysSignal()(config)
 	WithTimeout(15 * time.Minute)(config)
 
