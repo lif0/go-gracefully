@@ -1,12 +1,31 @@
-# go-gracefully
+<div align="center">
+  <!-- Logo -->
+  <img src=".github/assets/logo_round.png" width="256" height="256" alt="go-gracefully logo">
 
-[![build](https://github.com/lif0/go-gracefully/workflows/build/badge.svg)](https://github.com/lif0/go-gracefully/workflows/build/badge.svg)
-[![go reference](https://pkg.go.dev/badge/github.com/lif0/go-gracefully.svg)](https://pkg.go.dev/github.com/lif0/go-gracefully)
-![last version](https://img.shields.io/github/v/tag/lif0/go-gracefully?label=latest)
-[![coverage](https://coveralls.io/repos/github/lif0/go-gracefully/badge.svg?branch=main)](https://coveralls.io/github/lif0/go-gracefully?branch=main)
-[![report card](https://goreportcard.com/badge/github.com/lif0/go-gracefully)](https://goreportcard.com/report/github.com/lif0/go-gracefully)
+  <!-- Badges -->
+  <p align="center">
+    <a href="https://github.com/lif0/go-gracefully/workflows/build/badge.svg">
+      <img src="https://github.com/lif0/go-gracefully/workflows/build/badge.svg" alt="build">
+    </a>
+    <a href="https://pkg.go.dev/github.com/lif0/go-gracefully">
+      <img src="https://pkg.go.dev/badge/github.com/lif0/go-gracefully.svg" alt="go reference">
+    </a>
+    <img src="https://img.shields.io/github/v/tag/lif0/go-gracefully?label=latest" alt="latest version">
+    <a href="https://coveralls.io/github/lif0/go-gracefully?branch=main">
+      <img src="https://coveralls.io/repos/github/lif0/go-gracefully/badge.svg?branch=main" alt="coverage">
+    </a>
+    <a href="https://goreportcard.com/report/github.com/lif0/go-gracefully">
+      <img src="https://goreportcard.com/badge/github.com/lif0/go-gracefully" alt="go report card">
+    </a>
+  </p>
 
-Graceful shutdown utility for Golang applications. Register objects that need cleanup and trigger shutdown on signals or custom events.
+  <!-- Description -->
+  <p align="center">
+    Graceful shutdown for Go services: register cleanup hooks and shut down safely on OS signals or custom events - without losing state in your stateful apps/services.
+  </p>
+</div>
+
+---
 
 ## Contents
 
@@ -19,6 +38,9 @@ Graceful shutdown utility for Golang applications. Register objects that need cl
     - [Step 3: Set triggers](#step-3-set-up-shutdown-triggers)
     - [Step 4: Handle shutdown](#step-4-handle-shutdown)
     - [Step 5: Unregister](#step-5-unregister-if-needed)
+- [Features]
+    - [Create&Register instances](#advanced-create-and-register-instances) 
+    - [Error handling](#error-handling)
 - [Examples](#-examples)
     - [app-counter](#app-counter)
     - [more](#more)
