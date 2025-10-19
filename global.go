@@ -1,6 +1,8 @@
 package gracefully
 
 import (
+	"context"
+
 	"github.com/lif0/go-gracefully/internal"
 	"github.com/lif0/pkg/utils/errx"
 )
@@ -24,6 +26,13 @@ func SetGlobal(gr *Registry) {
 // Register is a shortcut for DefaultRegisterer.Register(c).
 func Register(igs GracefulShutdownObject) error {
 	return DefaultRegisterer.Register(igs)
+}
+
+// RegisterFunc registers the provided func with the DefaultRegisterer.
+//
+// Register is a shortcut for DefaultRegisterer.RegisterFunc(f).
+func RegisterFunc(f func(context.Context) error) error {
+	return DefaultRegisterer.RegisterFunc(f)
 }
 
 // Unregister removes the registration of the provided GracefulShutdownObject from the

@@ -38,7 +38,7 @@
     - [Step 3: Set triggers](#step-3-set-up-shutdown-triggers)
     - [Step 4: Handle shutdown](#step-4-handle-shutdown)
     - [Step 5: Unregister](#step-5-unregister-if-needed)
-- [Features]
+- [Features](#feature)
     - [Create&Register instances](#advanced-create-and-register-instances) 
     - [Error handling](#error-handling)
 - [Examples](#-examples)
@@ -197,6 +197,8 @@ gracefully.WaitShutdown()
 unregistered := gracefully.Unregister(server) // Returns true if removed
 ```
 
+## Feature
+
 ### Advanced: Create and Register Instances
 
 Use generics for quick creation:
@@ -210,7 +212,6 @@ batcher := gracefully.NewInstance(func() *MyBatcher {
 ### Error Handling
 
 - Check `gracefully.GlobalErrors` after shutdown.
-- Specific errors: `ErrAllInstanceShutdownAlready`, `AlreadyRegisteredError`.
 
 For full details, see the GoDoc: [pkg.go.dev/github.com/lif0/go-gracefully](https://pkg.go.dev/github.com/lif0/go-gracefully).
 
@@ -271,12 +272,14 @@ Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/ma
 
 ## 🗺️ Roadmap
 
-- [ ] Priority-based shutdown ordering.
-- [ ] Support for asynchronous shutdowns.
-- [ ] Integration with popular libraries (e.g., net/http.Server wrappers).
-- [ ] Improved logging and metrics integration.
-- [ ] Full unit-test suite.
-- [ ] Full benchmark suite.
+- [x] Add an interface for validating the structure being registered
+- [x] Add object registration/deregistration
+- [x] Add options for the GracefulShutdown trigger (WithUserChanSignal, WithCustomSystemSignal, WithSysSignal, WithTimeout)
+- [x] Add the ability to register functions
+- [ ] Reach >90% test coverage
+- [ ] Write benchmarks
+- [ ] (Internal) Improve the deduplication algorithm (add an OrderedMap)
+
 
 ## 📄 License
 

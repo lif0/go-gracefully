@@ -17,11 +17,27 @@ type Registerer interface {
 	// or if it — in combination with already registered services — violates uniqueness
 	// criteria (e.g., duplicate pointers).
 	//
+	// Important:
+	//   - instance.GracefulShutdown() are executed in the exact order they were registered.
+	//
 	// If the provided GracefulShutdownObject is equal to a service already registered
 	// (which includes the case of re-registering the same service), the
-	// returned error is an instance of AlreadyRegisteredError, which
+	// returned error is ErrAlreadyRegistered, which
 	// contains the previously registered service.
 	Register(GracefulShutdownObject) error
+	// RegisterFunc registers a shutdown callback (func(context.Context) error) to be
+	// executed during graceful shutdown.
+	//
+	// Important:
+	//   - Callbacks registered via RegisterFunc CANNOT be removed (there is no
+	//     deregistration for functions). Deregistration is only supported for
+	//     services added via Register.
+	//   - Callbacks are executed in the exact order they were registered.
+	//
+	// If the provided function is nil, an error is returned. Registering the same
+	// logical function multiple times is allowed; each registration is treated as a
+	// separate callback and will be invoked separately.
+	RegisterFunc(func(context.Context) error) error
 	// MustRegister works like Register but registers any number of
 	// GracefulShutdownObjects and panics upon the first registration that causes an
 	// error.

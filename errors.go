@@ -2,20 +2,10 @@ package gracefully
 
 import "errors"
 
-var ErrAllInstanceShutdownAlready = errors.New("after calling Registerer.Shutdown, you cannot register anymore")
+// ErrShutdownCalled is returned when Register is invoked after Shutdown.
+// Use errors.Is(err, ErrShutdownCalled) to detect this case.
+var ErrShutdownCalled = errors.New("registration disabled after Shutdown")
 
-// AlreadyRegisteredError is returned by the Register method if the GracefulShutdownObject to
-// be registered has already been registered before, or a different GracefulShutdownObject
-// that shares the same pointer has been registered before. Registration fails
-// in that case, but you can detect from the kind of error what has
-// happened. The error contains fields for the existing GracefulShutdownObject and the
-// (rejected) new GracefulShutdownObject that equals the existing one. This can be used to
-// find out if an equal GracefulShutdownObject has been registered before and switch over to
-// using the old one, as demonstrated in the example.
-type AlreadyRegisteredError struct {
-	ExistingInstance, NewInstance GracefulShutdownObject
-}
-
-func (e *AlreadyRegisteredError) Error() string {
-	return "duplicate graceful shutdown instance registration attempted"
-}
+// ErrAlreadyRegistered is returned when trying to register the same instance twice
+// (or another instance with the same identity). Use errors.Is(err, ErrAlreadyRegistered).
+var ErrAlreadyRegistered = errors.New("instance already registered")

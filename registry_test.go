@@ -27,6 +27,20 @@ func (f *fakeGSO) GracefulShutdown(ctx context.Context) error {
 	return f.ret
 }
 
+type fakeService struct {
+	calls int32
+	ret   error
+	hook  func()
+}
+
+func (f *fakeService) Close(ctx context.Context) error {
+	if f.hook != nil {
+		f.hook()
+	}
+	atomic.AddInt32(&f.calls, 1)
+	return f.ret
+}
+
 func assertMultiErrorContains(t *testing.T, me errx.MultiError, target error) {
 	t.Helper()
 
@@ -93,14 +107,12 @@ func Test_Register(t *testing.T) {
 		// arrange
 		r := gracefully.NewRegistry()
 		f := &fakeGSO{}
-		assert.NoError(t, r.Register(f))
-		// act
 		err := r.Register(f)
+		assert.NoError(t, err)
+		// act
+		err = r.Register(f)
 		// assert
-		var are *gracefully.AlreadyRegisteredError
-		assert.ErrorAs(t, err, &are)
-		assert.Same(t, f, are.ExistingInstance)
-		assert.Same(t, f, are.NewInstance)
+		assert.ErrorIs(t, err, gracefully.ErrAlreadyRegistered)
 	})
 
 	t.Run("race/concurrentSameInstance", func(t *testing.T) {
@@ -130,8 +142,7 @@ func Test_Register(t *testing.T) {
 				nils++
 				continue
 			}
-			var are *gracefully.AlreadyRegisteredError
-			assert.ErrorAs(t, e, &are)
+			assert.ErrorIs(t, e, gracefully.ErrAlreadyRegistered)
 			dups++
 		}
 		assert.Equal(t, 1, nils)
@@ -150,8 +161,83 @@ func Test_Register(t *testing.T) {
 		// act
 		err := r.Register(&fakeGSO{})
 		// assert
-		assert.ErrorIs(t, firstErr(r.Shutdown(context.Background())), gracefully.ErrAllInstanceShutdownAlready)
-		assert.ErrorIs(t, err, gracefully.ErrAllInstanceShutdownAlready)
+		assert.ErrorIs(t, firstErr(r.Shutdown(context.Background())), gracefully.ErrShutdownCalled)
+		assert.ErrorIs(t, err, gracefully.ErrShutdownCalled)
+	})
+}
+
+func Test_RegisterFunc(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ok/basic", func(t *testing.T) {
+		t.Parallel()
+		// arrange
+		r := gracefully.NewRegistry()
+		f := &fakeService{}
+		// act
+		err := r.RegisterFunc(f.Close)
+		// assert
+		assert.NoError(t, err)
+	})
+
+	t.Run("err/duplicate", func(t *testing.T) {
+		t.Parallel()
+		// arrange
+		r := gracefully.NewRegistry()
+		f := &fakeService{}
+		err := r.RegisterFunc(f.Close)
+		assert.NoError(t, err)
+		// act
+		err = r.RegisterFunc(f.Close)
+		// assert
+		assert.NoError(t, err)
+	})
+
+	t.Run("race/concurrentSameInstance", func(t *testing.T) {
+		t.Parallel()
+		// arrange
+		r := gracefully.NewRegistry()
+		f := &fakeService{}
+		const n = 32
+		errs := make(chan error, n)
+		var wg sync.WaitGroup
+		wg.Add(n)
+
+		// act
+		for i := 0; i < n; i++ {
+			go func() {
+				defer wg.Done()
+				errs <- r.RegisterFunc(f.Close)
+			}()
+		}
+		wg.Wait()
+		close(errs)
+
+		// assert
+		var nils, dups int
+		for e := range errs {
+			if e == nil {
+				nils++
+				continue
+			}
+
+			assert.ErrorIs(t, e, gracefully.ErrAlreadyRegistered)
+			dups++
+		}
+		assert.Equal(t, n, nils)
+	})
+
+	t.Run("err/afterShutdown", func(t *testing.T) {
+		t.Parallel()
+		// arrange
+		r := gracefully.NewRegistry()
+		_ = r.Shutdown(context.Background())
+		// act
+		f := &fakeService{}
+		err := r.RegisterFunc(f.Close)
+		// assert
+		assert.ErrorIs(t, firstErr(r.Shutdown(context.Background())), gracefully.ErrShutdownCalled)
+		assert.ErrorIs(t, err, gracefully.ErrShutdownCalled)
 	})
 }
 
@@ -185,6 +271,37 @@ func Test_Unregister(t *testing.T) {
 		assert.False(t, ok)
 	})
 }
+
+// func Test_UnregisterFunc(t *testing.T) {
+// 	t.Parallel()
+
+// 	t.Run("ok/idempotent", func(t *testing.T) {
+// 		t.Parallel()
+// 		// arrange
+// 		r := gracefully.NewRegistry()
+// 		f := &fakeGSO{}
+// 		assert.NoError(t, r.RegisterFunc(f.GracefulShutdown))
+// 		// act
+// 		ok1 := r.UnregisterFunc(f.GracefulShutdown)
+// 		ok2 := r.UnregisterFunc(f.GracefulShutdown)
+// 		// assert
+// 		assert.True(t, ok1)
+// 		assert.False(t, ok2)
+// 	})
+
+// 	t.Run("err/afterShutdown", func(t *testing.T) {
+// 		t.Parallel()
+// 		// arrange
+// 		r := gracefully.NewRegistry()
+// 		f := &fakeGSO{}
+// 		assert.NoError(t, r.RegisterFunc(f.GracefulShutdown))
+// 		_ = r.Shutdown(context.Background())
+// 		// act
+// 		ok := r.UnregisterFunc(f.GracefulShutdown)
+// 		// assert
+// 		assert.False(t, ok)
+// 	})
+// }
 
 func Test_MustRegister(t *testing.T) {
 	t.Parallel()
@@ -250,7 +367,7 @@ func Test_Shutdown(t *testing.T) {
 		me := r.Shutdown(context.Background())
 		// assert
 		// MultiError должен содержать ErrAllInstanceShutdownAlready
-		assertMultiErrorContains(t, me, gracefully.ErrAllInstanceShutdownAlready)
+		assertMultiErrorContains(t, me, gracefully.ErrShutdownCalled)
 	})
 }
 

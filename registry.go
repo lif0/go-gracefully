@@ -10,12 +10,18 @@ import (
 	"github.com/lif0/pkg/utils/errx"
 )
 
+var stubFunc = func(context.Context) error {
+	return nil
+}
+
 // Registry is a thread-safe registry for instances which should be can graceful shutdown.
 //
 // Use NewRegister to create a new instance.
 type Registry struct {
-	mu        sync.Mutex
-	instances map[unsafe.Pointer]GracefulShutdownObject
+	mu sync.Mutex
+
+	gsiHash map[unsafe.Pointer]int
+	gsFunc  []func(context.Context) error
 
 	// chan shutdown done
 	chsd     chan struct{}
@@ -28,10 +34,11 @@ type Registry struct {
 // (e.g. for testing purposes).
 func NewRegistry() *Registry {
 	return &Registry{
-		mu:        sync.Mutex{},
-		instances: make(map[unsafe.Pointer]GracefulShutdownObject),
-		disposed:  atomic.Bool{},
-		chsd:      make(chan struct{}),
+		mu:       sync.Mutex{},
+		gsiHash:  make(map[unsafe.Pointer]int),
+		gsFunc:   make([]func(context.Context) error, 0),
+		disposed: atomic.Bool{},
+		chsd:     make(chan struct{}),
 	}
 }
 
@@ -49,14 +56,29 @@ func (r *Registry) Register(igs GracefulShutdownObject) error {
 	}
 
 	ptr := reflect.ValueOf(igs).UnsafePointer()
-	if ei, ok := r.instances[ptr]; ok {
-		return &AlreadyRegisteredError{
-			ExistingInstance: ei,
-			NewInstance:      igs,
-		}
+	if _, ok := r.gsiHash[ptr]; ok {
+		return ErrAlreadyRegistered
 	}
 
-	r.instances[ptr] = igs
+	r.gsFunc = append(r.gsFunc, igs.GracefulShutdown)
+	r.gsiHash[ptr] = len(r.gsFunc) - 1
+	return nil
+}
+
+// RegisterFunc implements Registerer.
+func (r *Registry) RegisterFunc(f func(context.Context) error) error {
+	if err := r.isDisposed(); err != nil {
+		return err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if err := r.isDisposed(); err != nil {
+		return err
+	}
+
+	r.gsFunc = append(r.gsFunc, f)
 	return nil
 }
 
@@ -74,12 +96,13 @@ func (r *Registry) Unregister(igs GracefulShutdownObject) bool {
 	}
 
 	ptr := reflect.ValueOf(igs).UnsafePointer()
-	if _, ok := r.instances[ptr]; !ok {
-		return false
+	if i, ok := r.gsiHash[ptr]; ok {
+		r.gsFunc[i] = stubFunc
+		delete(r.gsiHash, ptr)
+		return true
 	}
 
-	delete(r.instances, ptr)
-	return true
+	return false
 }
 
 // MustRegister implements Registerer.
@@ -103,12 +126,12 @@ func (r *Registry) Shutdown(ctx context.Context) errx.MultiError {
 	defer r.mu.Unlock()
 
 	if !r.disposed.CompareAndSwap(false, true) {
-		return errx.MultiError{ErrAllInstanceShutdownAlready}
+		return errx.MultiError{ErrShutdownCalled}
 	}
 
 	errs := errx.MultiError{}
-	for _, v := range r.instances {
-		gsErr := v.GracefulShutdown(ctx)
+	for _, f := range r.gsFunc {
+		gsErr := f(ctx)
 		if gsErr != nil {
 			errs.Append(gsErr)
 		}
@@ -127,7 +150,7 @@ func (r *Registry) WaitShutdown() {
 // isDisposed ...
 func (r *Registry) isDisposed() error {
 	if r.disposed.Load() {
-		return ErrAllInstanceShutdownAlready
+		return ErrShutdownCalled
 	}
 	return nil
 }
