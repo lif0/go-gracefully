@@ -305,7 +305,7 @@ Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/ma
 - [x] Add object registration/deregistration
 - [x] Add options for the GracefulShutdown trigger (WithUserChanSignal, WithCustomSystemSignal, WithSysSignal, WithTimeout)
 - [x] Add the ability to register functions
-- [ ] Reach >90% test coverage
+- [x] Reach >90% test coverage
 - [ ] Write benchmarks
 - [ ] (Internal) Improve the deduplication algorithm (add an OrderedMap)
 
