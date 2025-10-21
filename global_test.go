@@ -68,9 +68,10 @@ func TestGlobal(t *testing.T) {
 
 	// pkg have bug in empty err it have len(multi_err) == 1
 	globalErr := gracefully.GlobalError()
-	_ = globalErr
-	// assert.True(t, globalErr.IsEmpty())
-	// assert.NoError(t, globalErr.MaybeUnwrap())
+	assert.Len(t, globalErr, 0)
+	assert.True(t, globalErr.IsEmpty())
+
+	assert.NoError(t, globalErr.MaybeUnwrap())
 
 	// edge: direct nil global panics for all helpers
 	// act
