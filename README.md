@@ -107,9 +107,31 @@ func (s *MyBatcher) GracefulShutdown(ctx context.Context) error {
 }
 ```
 
-### Step 2: Register Objects
+### Step 2: Register Objects/Register Func
 
 Use the global registry:
+
+```go
+import "github.com/lif0/go-gracefully"
+
+type MyBatcher struct {
+  // some fields
+}
+
+func (mb *MyBatcher) GracefulShutdown() {...}
+
+func (mb *MyBatcher) Closer() {...}
+
+// order is important
+// at first will be called GracefulShutdown()
+// at second will be called Closer()
+
+myBatcher := &MyBatcher{}
+gracefully.MustRegister(myBatcher) // will be register myBatcher.GracefulShutdown()
+gracefully.RegisterFunc(myBatcher.Closer)
+```
+
+or
 
 ```go
 import "github.com/lif0/go-gracefully"
@@ -151,6 +173,8 @@ A repeated signal will invoke `os.Exit(130)`, which immediately terminates the a
 
 Provides your own custom signal channel for handling OS signals.
 
+⚠️ Don't close os.Signal chan.
+
 ```go
 ch := make(chan os.Signal, 1)
 signal.Notify(ch, syscall.SIGUSR1 /* or any other signals */)
@@ -161,16 +185,21 @@ gracefully.SetShutdownTrigger(ctx, gracefully.WithCustomSystemSignal(ch))
 
 Allows you to pass one or more custom channels. When any of these channels is closed or receives a value, the graceful shutdown process will be triggered.
 
+A repeated signal will invoke `os.Exit(130)`, which immediately terminates the application without waiting for any ongoing processes.
+
+⚠️ Don't close custom chan.
+
 ```go
 chShutdown := make(chan struct{})
 gracefully.SetShutdownTrigger(ctx, gracefully.WithUserChanSignal(chShutdown))
 
-// To trigger the shutdown: close(chShutdown) or chShutdown <- struct{}{}
+chShutdown <- struct{}{} // to trigger the shutdown
+chShutdown <- struct{}{} // to trigger the os.Exit
 ```
 
 #### WithTimeout(d time.Duration)
 
-Sets the maximum duration allowed for completing the shutdown of all registered objects. The default value is 15 minutes.
+Sets the maximum duration for the graceful shutdown. By default, no timeout is applied - the service waits for all tasks to finish. A non-positive timeout disables the shutdown deadline.
 
 ### Step 4: Handle Shutdown
 

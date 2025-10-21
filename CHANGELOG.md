@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Changed
 
-## [v0.0.2]
+## [v0.0.2] - 2025-10-20
 ### Added
-### Fixed
+- Introduced `RegisterFunc` functionality.
 ### Changed
+- Registration order is now significant.
+- Default WithTimeout is off;
 
-## [v0.0.1]
+
+## [v0.0.1] - 2025-10-13
 ### Added
-- feat: release graceful shutdown
+- Implemented graceful shutdown mechanism.
