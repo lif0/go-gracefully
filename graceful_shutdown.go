@@ -40,12 +40,16 @@ func SetShutdownTrigger(ctx context.Context, opts ...TriggerOption) {
 
 			if firstSignal {
 				once.Do(func() {
-					shutdownCtx, cancel := context.WithTimeout(ctx, c.timeout)
-					defer cancel()
+					var shutdownCtx context.Context = ctx
+					if c.timeout > 0 {
+						sctx, cancel := context.WithTimeout(ctx, c.timeout)
+						shutdownCtx = sctx
+						defer cancel()
+					}
 
 					// log.Printf("gogracefully: Starting graceful shutdown with timeout\n")
 					if muErr := defaultRegistry.Shutdown(shutdownCtx); muErr != nil {
-						GlobalErrors.Mutate(func(v *errx.MultiError) {
+						globalErrors.Mutate(func(v *errx.MultiError) {
 							v.Append(muErr)
 						})
 					}

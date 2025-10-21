@@ -55,12 +55,13 @@ func WithUserChanSignal(uch ...<-chan struct{}) TriggerOption {
 	}
 }
 
-// WithTimeout sets the shutdown timeout for the graceful shutdown process.
-// If not specified, the default timeout is 30 seconds.
+// WithTimeout sets the maximum duration for the graceful shutdown.
+// By default, no timeout is applied - the service waits for all tasks to finish.
+// A non-positive timeout disables the shutdown deadline.
 //
 // Example:
 //
-//	WithTimeout(45 * time.Second)
+//	WithTimeout(5 * time.Minute)
 func WithTimeout(timeout time.Duration) TriggerOption {
 	return func(c *triggerConfig) {
 		c.timeout = timeout
@@ -71,7 +72,7 @@ func WithTimeout(timeout time.Duration) TriggerOption {
 func newDefaultTriggerConfig() *triggerConfig {
 	config := &triggerConfig{}
 	WithSysSignal()(config)
-	WithTimeout(15 * time.Minute)(config)
+	WithTimeout(0)(config)
 
 	return config
 }

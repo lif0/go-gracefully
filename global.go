@@ -9,16 +9,21 @@ import (
 
 var (
 	defaultRegistry = NewRegistry()
+	globalErrors    = internal.NewSyncObject(errx.MultiError{})
 
 	DefaultRegisterer Registerer = defaultRegistry
-	GlobalErrors                 = internal.NewSyncObject(errx.MultiError{})
 )
+
+func GlobalError() errx.MultiError {
+	return *globalErrors.GetObject()
+}
 
 // SetGlobal sets a custom GracefullyRegister as the global registry.
 // This allows replacing the default registry with a user-provided one
 // (e.g. for testing purposes).
 func SetGlobal(gr *Registry) {
-	DefaultRegisterer = gr
+	defaultRegistry = gr
+	DefaultRegisterer = defaultRegistry
 }
 
 // Register registers the provided GracefulShutdownObject with the DefaultRegisterer.

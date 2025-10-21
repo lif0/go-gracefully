@@ -37,8 +37,8 @@ func NewRegistry() *Registry {
 		mu:       sync.Mutex{},
 		gsiHash:  make(map[unsafe.Pointer]int),
 		gsFunc:   make([]func(context.Context) error, 0),
-		disposed: atomic.Bool{},
 		chsd:     make(chan struct{}),
+		disposed: atomic.Bool{},
 	}
 }
 
