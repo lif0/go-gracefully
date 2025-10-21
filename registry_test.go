@@ -13,13 +13,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type fakeGSO struct {
+type stubGSO struct {
+	id    int32
 	calls int32
 	ret   error
 	hook  func()
 }
 
-func (f *fakeGSO) GracefulShutdown(ctx context.Context) error {
+func (f *stubGSO) GracefulShutdown(ctx context.Context) error {
 	if f.hook != nil {
 		f.hook()
 	}
@@ -95,7 +96,7 @@ func Test_Register(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		f := &fakeGSO{}
+		f := &stubGSO{}
 		// act
 		err := r.Register(f)
 		// assert
@@ -106,7 +107,7 @@ func Test_Register(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		f := &fakeGSO{}
+		f := &stubGSO{}
 		err := r.Register(f)
 		assert.NoError(t, err)
 		// act
@@ -119,7 +120,7 @@ func Test_Register(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		f := &fakeGSO{}
+		f := &stubGSO{}
 		const n = 32
 		errs := make(chan error, n)
 		var wg sync.WaitGroup
@@ -159,7 +160,7 @@ func Test_Register(t *testing.T) {
 		r := gracefully.NewRegistry()
 		_ = r.Shutdown(context.Background())
 		// act
-		err := r.Register(&fakeGSO{})
+		err := r.Register(&stubGSO{})
 		// assert
 		assert.ErrorIs(t, firstErr(r.Shutdown(context.Background())), gracefully.ErrShutdownCalled)
 		assert.ErrorIs(t, err, gracefully.ErrShutdownCalled)
@@ -248,7 +249,7 @@ func Test_Unregister(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		f := &fakeGSO{}
+		f := &stubGSO{}
 		assert.NoError(t, r.Register(f))
 		// act
 		ok1 := r.Unregister(f)
@@ -262,7 +263,7 @@ func Test_Unregister(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		f := &fakeGSO{}
+		f := &stubGSO{}
 		assert.NoError(t, r.Register(f))
 		_ = r.Shutdown(context.Background())
 		// act
@@ -310,7 +311,7 @@ func Test_MustRegister(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		a, b := &fakeGSO{}, &fakeGSO{}
+		a, b := &stubGSO{}, &stubGSO{}
 		// act
 		assert.NotPanics(t, func() {
 			r.MustRegister(a, b)
@@ -324,7 +325,7 @@ func Test_MustRegister(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		a := &fakeGSO{}
+		a := &stubGSO{}
 		// act + assert
 		assert.Panics(t, func() {
 			r.MustRegister(a, a)
@@ -339,9 +340,9 @@ func Test_Shutdown(t *testing.T) {
 		t.Parallel()
 		// arrange
 		r := gracefully.NewRegistry()
-		a := &fakeGSO{}
-		b := &fakeGSO{ret: errors.New("boom")}
-		c := &fakeGSO{}
+		a := &stubGSO{}
+		b := &stubGSO{ret: errors.New("boom")}
+		c := &stubGSO{}
 		assert.NoError(t, r.Register(a))
 		assert.NoError(t, r.Register(b))
 		assert.NoError(t, r.Register(c))

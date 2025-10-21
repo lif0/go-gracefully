@@ -121,7 +121,7 @@ func Test_newDefaultTriggerConfig(t *testing.T) {
 
 		// assert
 		assert.NotNil(t, cfg.sysch)
-		assert.Equal(t, 15*time.Minute, cfg.timeout)
+		assert.Equal(t, time.Duration(0), cfg.timeout)
 	})
 
 	t.Run("api/independent_instances", func(t *testing.T) {
