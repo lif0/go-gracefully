@@ -6,9 +6,25 @@ import (
 	"os"
 	"sync"
 
+	"github.com/lif0/go-gracefully/internal"
 	"github.com/lif0/pkg/concurrency/chanx"
 	"github.com/lif0/pkg/utils/errx"
 )
+
+var status = internal.NewSyncObject(StatusRunning)
+
+// GetStatus returns the current service status during graceful shutdown.
+//
+// It is safe for concurrent use and reflects the latest recorded state.
+func GetStatus() Status {
+	return *status.GetObject()
+}
+
+func setStatus(nS Status) {
+	status.Mutate(func(v *Status) {
+		*v = nS
+	})
+}
 
 // SetShutdownTrigger sets up a trigger for Registry.Shutdown.
 //
@@ -36,11 +52,15 @@ func SetShutdownTrigger(ctx context.Context, opts ...TriggerOption) {
 				log.Printf("gogracefully: Received user trigger\n")
 			}
 
+			setStatus(StatusDraining)
+
 			firstSignal = !firstSignal
 
 			if firstSignal {
 				once.Do(func() {
-					var shutdownCtx context.Context = ctx
+					defer setStatus(StatusStopped)
+
+					shutdownCtx := ctx
 					if c.timeout > 0 {
 						sctx, cancel := context.WithTimeout(ctx, c.timeout)
 						shutdownCtx = sctx
