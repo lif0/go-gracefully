@@ -20,6 +20,8 @@ func TestGlobal(t *testing.T) {
 	r := gracefully.NewRegistry()
 	gracefully.SetGlobal(r)
 
+	assert.Equal(t, gracefully.StatusRunning, gracefully.GetStatus())
+
 	// assert
 	assert.Equal(t, r, gracefully.DefaultRegisterer)
 
@@ -48,7 +50,10 @@ func TestGlobal(t *testing.T) {
 	assert.False(t, unreg2, "second unregister should report false (idempotent)")
 
 	// act
-	err = gracefully.RegisterFunc(func(ctx context.Context) error { return nil })
+	err = gracefully.RegisterFunc(func(ctx context.Context) error {
+		assert.Equal(t, gracefully.StatusDraining, gracefully.GetStatus())
+		return nil
+	})
 	// assert
 	assert.NoError(t, err)
 
@@ -65,6 +70,9 @@ func TestGlobal(t *testing.T) {
 	gracefully.WaitShutdown()
 	gracefully.WaitShutdown()
 	gracefully.WaitShutdown()
+
+	time.Sleep(time.Millisecond * 150)
+	assert.Equal(t, gracefully.StatusStopped, gracefully.GetStatus())
 
 	// pkg have bug in empty err it have len(multi_err) == 1
 	globalErr := gracefully.GlobalError()

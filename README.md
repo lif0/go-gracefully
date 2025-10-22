@@ -226,9 +226,41 @@ gracefully.WaitShutdown()
 unregistered := gracefully.Unregister(server) // Returns true if removed
 ```
 
-## Feature
+## Advanced
 
-### Advanced: Create and Register Instances
+### Check current Status
+
+Use `gracefully.GetStatus()` for check status.
+
+Statuses:
+
+| Name             | Description                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `StatusRunning`  | The service is running and accepting new requests.                                                                 |
+| `StatusDraining` | The service is shutting down gracefully; it no longer accepts new requests but continues processing existing ones. |
+| `StatusStopped`  | Graceful shutdown has fully finished; all resources are released and the process can safely exit.                  |
+
+
+```go
+import (
+	"fmt"
+
+	"github.com/lif0/go-gracefully"
+)
+
+func handleServiceStatus() {
+	switch gracefully.GetStatus() {
+	case gracefully.StatusRunning:
+		// ignore
+	case gracefully.StatusDraining:
+		// For example: return error for any request
+	case gracefully.StatusStopped:
+		// For Example: log and finish app
+	}
+}
+```
+
+### Create and Register Instances
 
 Use generics for quick creation:
 
@@ -308,6 +340,8 @@ Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/ma
 - [x] Reach >90% test coverage
 - [ ] Write benchmarks
 - [ ] (Internal) Improve the deduplication algorithm (add an OrderedMap)
+- [x] Add func: gracefully.Status.
+- [ ] Add func: gracefully.WatchStatus().
 
 
 ## 📄 License
