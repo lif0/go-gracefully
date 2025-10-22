@@ -22,5 +22,8 @@ func (so *SyncObject[T]) Mutate(f func(v *T)) {
 }
 
 func (so *SyncObject[T]) GetObject() *T {
+	so.mu.Lock()
+	defer so.mu.Unlock()
+
 	return &so.v
 }
