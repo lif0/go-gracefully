@@ -17,7 +17,8 @@ var status = internal.NewSyncObject(StatusRunning)
 //
 // It is safe for concurrent use and reflects the latest recorded state.
 func GetStatus() Status {
-	return *status.GetObject()
+	status := status.GetObject()
+	return *status
 }
 
 func setStatus(nS Status) {
