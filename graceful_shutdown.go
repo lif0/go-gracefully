@@ -57,24 +57,26 @@ func SetShutdownTrigger(ctx context.Context, opts ...TriggerOption) {
 			firstSignal = !firstSignal
 
 			if firstSignal {
-				once.Do(func() {
-					defer setStatus(StatusStopped)
+				go func() { // because we should be have can handle second signal.
+					once.Do(func() {
+						defer setStatus(StatusStopped)
 
-					shutdownCtx := ctx
-					if c.timeout > 0 {
-						sctx, cancel := context.WithTimeout(ctx, c.timeout)
-						shutdownCtx = sctx
-						defer cancel()
-					}
+						shutdownCtx := ctx
+						if c.timeout > 0 {
+							sctx, cancel := context.WithTimeout(ctx, c.timeout)
+							shutdownCtx = sctx
+							defer cancel()
+						}
 
-					// log.Printf("gogracefully: Starting graceful shutdown with timeout\n")
-					if muErr := defaultRegistry.Shutdown(shutdownCtx); muErr != nil && !muErr.IsEmpty() {
-						globalErrors.Mutate(func(v *errx.MultiError) {
-							v.Append(muErr)
-						})
-					}
-					log.Printf("gogracefully: Graceful shutdown completed. Use gogracefully.GlobalErrors for checks errors\n")
-				})
+						// log.Printf("gogracefully: Starting graceful shutdown with timeout\n")
+						if muErr := defaultRegistry.Shutdown(shutdownCtx); muErr != nil && !muErr.IsEmpty() {
+							globalErrors.Mutate(func(v *errx.MultiError) {
+								v.Append(muErr)
+							})
+						}
+						log.Printf("gogracefully: Graceful shutdown completed. Use gogracefully.GlobalErrors for checks errors\n")
+					})
+				}()
 			} else {
 				// Second or subsequent signal: Force exit
 				log.Printf("gogracefully: Received additional signal - forcing exit\n")
