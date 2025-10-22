@@ -25,7 +25,7 @@ func main() {
 	fmt.Printf("Last counter: %d\n", counter.val)
 
 	go func() {
-		for {
+		for gracefully.GetStatus() == gracefully.StatusRunning {
 			time.Sleep(500 * time.Millisecond)
 			counter.Inc()
 			fmt.Printf("counter: %v\n", counter.val)

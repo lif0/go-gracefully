@@ -31,14 +31,19 @@ func main() {
 	go runServer(serverEventCollector, userEventCollector)
 
 	gracefully.WaitShutdown()
-	if gracefully.GlobalErrors.GetObject().MaybeUnwrap() != nil {
-		log.Println(gracefully.GlobalErrors.GetObject().MaybeUnwrap().Error())
+	if !gracefully.GlobalError().IsEmpty() {
+		log.Println(gracefully.GlobalError().MaybeUnwrap().Error())
 	}
 	log.Println("app is done...")
 }
 
 func runServer(serverEventCollector, userEventCollector *eventBatcher) {
 	http.HandleFunc("/user/event", func(w http.ResponseWriter, r *http.Request) {
+		if gracefully.GetStatus() != gracefully.StatusRunning {
+			w.Write([]byte("service is shutting down, try be later."))
+			return
+		}
+
 		events, err := toStringArr(r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
@@ -50,6 +55,11 @@ func runServer(serverEventCollector, userEventCollector *eventBatcher) {
 	})
 
 	http.HandleFunc("/server/event", func(w http.ResponseWriter, r *http.Request) {
+		if gracefully.GetStatus() != gracefully.StatusRunning {
+			w.Write([]byte("service is shutting down, try be later."))
+			return
+		}
+
 		events, err := toStringArr(r)
 		if err != nil {
 			w.Write([]byte(err.Error()))
