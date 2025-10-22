@@ -4,6 +4,7 @@ package gracefully_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -58,6 +59,13 @@ func TestGlobal(t *testing.T) {
 	assert.NoError(t, err)
 
 	// act
+	err = gracefully.RegisterFunc(func(ctx context.Context) error {
+		return errors.New("Some error")
+	})
+	// assert
+	assert.NoError(t, err)
+
+	// act
 	assert.NotPanics(t, func() { gracefully.MustRegister(obj) })
 	// assert (nothing extra)
 
@@ -76,10 +84,10 @@ func TestGlobal(t *testing.T) {
 
 	// pkg have bug in empty err it have len(multi_err) == 1
 	globalErr := gracefully.GlobalError()
-	assert.Len(t, globalErr, 0)
-	assert.True(t, globalErr.IsEmpty())
-
-	assert.NoError(t, globalErr.MaybeUnwrap())
+	assert.Len(t, globalErr, 1)
+	assert.False(t, globalErr.IsEmpty())
+	assert.Error(t, globalErr.MaybeUnwrap())
+	assert.ErrorContains(t, globalErr.MaybeUnwrap(), "Some error")
 
 	// edge: direct nil global panics for all helpers
 	// act
