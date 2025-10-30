@@ -65,7 +65,7 @@ func SetShutdownTrigger(ctx context.Context, opts ...TriggerOption) {
 
 						// log.Printf("gogracefully: Starting graceful shutdown with timeout\n")
 						if muErr := defaultRegistry.Shutdown(shutdownCtx); muErr != nil && !muErr.IsEmpty() {
-							globalErrors.Mutate(func(v *errx.MultiError) {
+							globalErrors.MutateValue(func(v *errx.MultiError) {
 								v.Append(muErr)
 							})
 						}

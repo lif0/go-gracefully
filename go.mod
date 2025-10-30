@@ -3,8 +3,8 @@ module github.com/lif0/go-gracefully
 go 1.24.0
 
 require (
-	github.com/lif0/pkg/concurrency v1.1.0
-	github.com/lif0/pkg/utils v1.1.0
+	github.com/lif0/pkg/concurrency v1.2.0
+	github.com/lif0/pkg/utils v1.2.0
 	github.com/stretchr/testify v1.11.1
 )
 

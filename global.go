@@ -3,19 +3,25 @@ package gracefully
 import (
 	"context"
 
-	"github.com/lif0/go-gracefully/internal"
+	"github.com/lif0/pkg/concurrency"
 	"github.com/lif0/pkg/utils/errx"
 )
 
 var (
 	defaultRegistry = NewRegistry()
-	globalErrors    = internal.NewSyncObject(errx.MultiError{})
+	globalErrors    = concurrency.NewSyncValue(errx.MultiError{})
 
 	DefaultRegisterer Registerer = defaultRegistry
 )
 
 func GlobalError() errx.MultiError {
-	return *globalErrors.GetObject()
+	var errs errx.MultiError
+
+	globalErrors.ReadValue(func(v *errx.MultiError) {
+		errs = append([]error(nil), *v...) // make copy
+	})
+
+	return errs
 }
 
 // SetGlobal sets a custom GracefullyRegister as the global registry.

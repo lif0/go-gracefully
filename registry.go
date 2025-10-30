@@ -8,11 +8,10 @@ import (
 	"unsafe"
 
 	"github.com/lif0/pkg/utils/errx"
+	"github.com/lif0/pkg/utils/structx"
 )
 
-var stubFunc = func(context.Context) error {
-	return nil
-}
+type anchor struct{ _ byte } // 1 byte size
 
 // Registry is a thread-safe registry for instances which should be can graceful shutdown.
 //
@@ -20,8 +19,8 @@ var stubFunc = func(context.Context) error {
 type Registry struct {
 	mu sync.Mutex
 
-	gsiHash map[unsafe.Pointer]int
-	gsFunc  []func(context.Context) error
+	gsiHash     *structx.OrderedMap[unsafe.Pointer, func(context.Context) error]
+	gsiFuncAnch []*anchor // wee should save pointer, because GC can remove it
 
 	// chan shutdown done
 	chsd     chan struct{}
@@ -34,9 +33,11 @@ type Registry struct {
 // (e.g. for testing purposes).
 func NewRegistry() *Registry {
 	return &Registry{
-		mu:       sync.Mutex{},
-		gsiHash:  make(map[unsafe.Pointer]int),
-		gsFunc:   make([]func(context.Context) error, 0),
+		mu: sync.Mutex{},
+
+		gsiHash:     structx.NewOrderedMap[unsafe.Pointer, func(context.Context) error](),
+		gsiFuncAnch: make([]*anchor, 0),
+
 		chsd:     make(chan struct{}),
 		disposed: atomic.Bool{},
 	}
@@ -56,12 +57,11 @@ func (r *Registry) Register(igs GracefulShutdownObject) error {
 	}
 
 	ptr := reflect.ValueOf(igs).UnsafePointer()
-	if _, ok := r.gsiHash[ptr]; ok {
+	if _, ok := r.gsiHash.Get(ptr); ok {
 		return ErrAlreadyRegistered
 	}
 
-	r.gsFunc = append(r.gsFunc, igs.GracefulShutdown)
-	r.gsiHash[ptr] = len(r.gsFunc) - 1
+	r.gsiHash.Put(ptr, igs.GracefulShutdown)
 	return nil
 }
 
@@ -78,7 +78,12 @@ func (r *Registry) RegisterFunc(f func(context.Context) error) error {
 		return err
 	}
 
-	r.gsFunc = append(r.gsFunc, f)
+	anchor := &anchor{}
+	ptr := unsafe.Pointer(anchor)
+
+	r.gsiHash.Put(ptr, f)
+	r.gsiFuncAnch = append(r.gsiFuncAnch, anchor)
+
 	return nil
 }
 
@@ -96,9 +101,8 @@ func (r *Registry) Unregister(igs GracefulShutdownObject) bool {
 	}
 
 	ptr := reflect.ValueOf(igs).UnsafePointer()
-	if i, ok := r.gsiHash[ptr]; ok {
-		r.gsFunc[i] = stubFunc
-		delete(r.gsiHash, ptr)
+	if _, ok := r.gsiHash.Get(ptr); ok {
+		structx.Delete(r.gsiHash, ptr)
 		return true
 	}
 
@@ -130,14 +134,14 @@ func (r *Registry) Shutdown(ctx context.Context) errx.MultiError {
 	}
 
 	errs := errx.MultiError{}
-	for _, f := range r.gsFunc {
+	for _, f := range r.gsiHash.Iter() {
 		gsErr := f(ctx)
 		if gsErr != nil {
 			errs.Append(gsErr)
 		}
 	}
 
-	// broadcast for all who call WaitShutdown
+	// broadcast for all who call WaitShutdown()
 	close(r.chsd)
 	return errs
 }
