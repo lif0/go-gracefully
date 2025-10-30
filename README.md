@@ -295,11 +295,6 @@ var stopChan chan struct{}
 
 func main() {
 	// configure
-    // It will be triggered:
-    // close(stopChan) OR
-    // stopChan<-struct{}{} OR
-    // kill {PID} (Ctrl+C in console)
-
 	gracefully.SetShutdownTrigger(
 		context.Background(),
 		gracefully.WithSysSignal(),
@@ -339,7 +334,7 @@ Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/ma
 - [x] Add the ability to register functions
 - [x] Reach >90% test coverage
 - [ ] Write benchmarks
-- [ ] (Internal) Improve the deduplication algorithm (add an OrderedMap)
+- [x] (Internal) Improve the deduplication algorithm (add an OrderedMap)
 - [x] Add func: gracefully.Status.
 - [ ] Add func: gracefully.WatchStatus().
 
