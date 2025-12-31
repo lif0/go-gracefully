@@ -11,15 +11,61 @@ import (
 	"github.com/lif0/pkg/utils/errx"
 )
 
-var status atomic.Uint32
+var (
+	status   atomic.Uint32
+	statusCh atomic.Pointer[chan struct{}]
+)
 
 func init() { setStatus(StatusRunning) }
 
 // GetStatus returns the current service status during graceful shutdown.
 //
 // It is safe for concurrent use and reflects the latest recorded state.
-func GetStatus() Status   { return Status(status.Load()) }
-func setStatus(nS Status) { status.Store(uint32(nS)) }
+func GetStatus() Status { return Status(status.Load()) }
+
+func setStatus(nS Status) {
+	status.Store(uint32(nS))
+
+	if statusCh.Load() != nil {
+		select {
+		case *statusCh.Load() <- struct{}{}:
+		default:
+		}
+	}
+}
+
+// WatchStatus subscribes to status changes.
+//
+// When the status changes, all provided callback functions are invoked.
+// Each callback receives the new status value as an argument.
+func WatchStatus(ctx context.Context, callbacks ...func(newStatus Status)) {
+	if statusCh.Load() == nil {
+		ch := make(chan struct{}, 3)
+		statusCh.CompareAndSwap(nil, &ch)
+	}
+
+	go func() {
+		lastStatus := status.Load()
+		e := *statusCh.Load()
+
+		for {
+			select {
+			case <-ctx.Done():
+				close(*statusCh.Load())
+				statusCh.Store(nil)
+				return
+			case <-e:
+				if status.Load() != lastStatus {
+					lastStatus = status.Load()
+					newStatus := GetStatus()
+					for i := range callbacks {
+						callbacks[i](newStatus)
+					}
+				}
+			}
+		}
+	}()
+}
 
 // SetShutdownTrigger sets up a trigger for Registry.Shutdown.
 //

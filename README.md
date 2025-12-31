@@ -260,6 +260,35 @@ func handleServiceStatus() {
 }
 ```
 
+---
+
+Or use `gracefully.WatchStatus(ctx, func(newStatus Status))` for subscribe status.
+
+```go
+import (
+	"fmt"
+
+	"github.com/lif0/go-gracefully"
+)
+
+func handleServiceStatus(newStatus gracefully.Status) {
+	switch newStatus {
+	case gracefully.StatusRunning:
+		// ignore
+	case gracefully.StatusDraining:
+		// For example: return error for any request
+	case gracefully.StatusStopped:
+		// For Example: log and finish app
+	}
+}
+
+func main() {
+  ctx := context.Background()
+  
+  gracefully.WatchStatus(ctx, handleServiceStatus)
+}
+```
+
 ### Create and Register Instances
 
 Use generics for quick creation:
@@ -292,8 +321,11 @@ import (
 )
 
 var stopChan chan struct{}
+var isProcessing atomic.Bool
 
 func main() {
+  isProcessing.Store(true)
+
 	// configure
 	gracefully.SetShutdownTrigger(
 		context.Background(),
@@ -301,12 +333,23 @@ func main() {
 		gracefully.WithUserChanSignal(stopChan),
 	)
 
+  gracefully.WatchStatus(ctx, func(newStatus Status) {
+    switch newStatus {
+    case gracefully.StatusRunning:
+      // ignore
+    case gracefully.StatusDraining:
+      isProcessing.Store(false)
+    case gracefully.StatusStopped:
+      isProcessing.Store(false)
+    }
+  })
+
 	counter := NewCounter()
 
 	gracefully.MustRegister(counter)
 
 	go func() {
-		for gracefully.GetStatus() == gracefully.StatusRunning {
+		for isProcessing.Load() {
 			time.Sleep(500 * time.Millisecond)
 			counter.Inc()
 			fmt.Printf("counter: %v\n", counter.val)
@@ -336,7 +379,7 @@ Check out the [examples directory](https://github.com/lif0/go-gracefully/tree/ma
 - [ ] Write benchmarks
 - [x] (Internal) Improve the deduplication algorithm (add an OrderedMap)
 - [x] Add func: gracefully.Status.
-- [ ] Add func: gracefully.WatchStatus().
+- [x] Add func: gracefully.WatchStatus().
 
 
 ## 📄 License

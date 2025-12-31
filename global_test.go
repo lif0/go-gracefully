@@ -17,6 +17,17 @@ func TestGlobal(t *testing.T) {
 	old := gracefully.DefaultRegisterer
 	t.Cleanup(func() { gracefully.DefaultRegisterer = old })
 
+	nextStatusWant := gracefully.StatusDraining
+	statusState := map[gracefully.Status]gracefully.Status{
+		gracefully.StatusDraining: gracefully.StatusStopped,
+		gracefully.StatusStopped:  222,
+	}
+
+	gracefully.WatchStatus(t.Context(), func(newStatus gracefully.Status) {
+		assert.Equal(t, nextStatusWant, newStatus, "want: #%s, actual: #%s", nextStatusWant, newStatus)
+		nextStatusWant = statusState[newStatus]
+	})
+
 	// act
 	r := gracefully.NewRegistry()
 	gracefully.SetGlobal(r)
@@ -97,4 +108,6 @@ func TestGlobal(t *testing.T) {
 	assert.Panics(t, func() { gracefully.WaitShutdown() })
 	assert.Panics(t, func() { _ = gracefully.RegisterFunc(func(ctx context.Context) error { return nil }) })
 	assert.Panics(t, func() { _ = gracefully.Unregister(obj) })
+
+	time.Sleep(time.Second)
 }
